@@ -1,0 +1,57 @@
+import cv2 
+import numpy as np 
+
+def hist_diff(frame1, frame2): 
+  ''' фун-ия нахождения гистограмм и нахождения разницы между ними'''
+  h1 = cv2.calcHist([frame1], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256]) 
+  h2 = cv2.calcHist([frame2], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256]) 
+
+  return cv2.compareHist(h1, h2, cv2.HISTCMP_BHATTACHARYYA) 
+
+def detect_scene(video_path, threshold=2.0):
+''' фун-ия детекции смены сцен, по гистограммам'''
+  cap = cv2.VideoCapture(video_path) 
+  prev_frame = None 
+  diffs = [] 
+  frameidx = 0  
+
+  while cap.isOpened(): 
+    ret, frame = cap.read() 
+    if not ret:
+      break
+    
+    if prev_frame is not None:
+      d = hist_diff(prev_frame, frame)
+      diffs.append(d)
+    
+    prev_frame = frame.copy()
+  
+  cap.release()
+
+  diffs = np.array(diffs)
+  mean = np.mean(diffs)
+  std = np.std(diffs)
+  threshold_new = mean + threshold * std
+
+  scene_change = []
+  for i, d in enumerate(diffs):
+    if d > threshold_new:
+      scene_change.append(i + 1)
+  return scene_change, diffs
+
+scene_changes, diifs = detect_scene('/content/drive/MyDrive/practical_data/man_in_costume.mp4', 2.0)
+print(f'Смены сцен по кадрам: {scene_changes}')
+
+cap = cv2.VideoCapture('/content/drive/MyDrive/practical_data/man_in_costume.mp4')
+fps = cap.get(cv2.CAP_PROP_FPS)
+print(f'FPS -> {fps}')
+cap.release()
+
+def frame_second(frame_num, fps):
+  ''' фун-ия нахождения секунды на котором произошел кадр смены сцены'''
+  seconds = frame_num / fps
+  return seconds
+
+for frame in scene_changes:
+  sec = frame_second(frame, fps)
+  print(f'Кадр под номером {frame} был на {sec}секунде')
